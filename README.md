@@ -48,4 +48,4 @@ To utilize the custom ping utility, you must execute the script using Python 3. 
 ```bash
 python3 ping.py <target> <num_requests>
 ```
-![output_example](Screenshot from 2023-10-12 22-28-56.png)
+![Output_Example](./png.png?raw=true "Output Example")

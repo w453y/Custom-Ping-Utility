@@ -1,51 +1,368 @@
 # Custom Ping Utility
 
-This Python script is a comprehensive custom implementation of the "ping" utility, designed to provide a deep understanding of its inner workings. It allows you to send ICMP Echo Request packets to a target IP address or domain and receive ICMP Echo Reply packets from the target. The utility calculates and displays round-trip time (RTT) for each request-reply cycle and provides extensive statistics on packet loss, minimum RTT, maximum RTT, average RTT, and RTT standard deviation.
+This utility is a custom implementation of the ping command, written in Python. It allows you to send ICMP echo requests to a specified target (IP address or domain) and receive echo replies, providing detailed statistics about the round-trip time (RTT) and packet loss.
 
-## Explanation
+## Code Explanation
 
-### ICMP Packet Generation
+### `main.py`
 
-At the core of this utility is the generation of ICMP (Internet Control Message Protocol) packets. ICMP is a fundamental protocol in computer networking, primarily used for error reporting and network troubleshooting. For this utility, ICMP packets serve the purpose of network diagnostics and latency measurement.
+#### Imports
+- **socket**: Provides low-level networking interface.
+- **argparse**: Parses command-line arguments.
+- **sys**: Provides access to system-specific parameters and functions.
+- **os**: Provides a way of using operating system dependent functionality.
+- **math**: Provides mathematical functions.
 
-1. **Checksum Calculation**: The foundation of ICMP packet generation is the calculation of the packet's checksum. The checksum is a crucial component that ensures data integrity. It acts as a mathematical value computed over the packet's contents, enabling the detection of errors or corruption during transmission. The `checksum(data)` function plays a central role in this process.
+#### Functions
 
-2. **Sending ICMP Echo Requests**: The core functionality of this utility starts with the `send_ping_request(destination, sequence_number)` function. This function is responsible for creating and dispatching ICMP Echo Request packets to the target. ICMP Echo Requests are the standard "ping" messages that check the availability and responsiveness of a network host. The function operates as follows:
-   - **Opening a Raw Socket**: It initiates by opening a raw socket. Raw sockets provide the capability to interact with network packets directly, allowing the construction and transmission of custom packets.
-   - **Constructing the ICMP Packet**: The function constructs an ICMP Echo Request packet with several critical attributes, including:
-     - **Type**: Set to 8, indicating that this is an ICMP Echo Request.
-     - **Code**: Set to 0, which is the standard code for Echo Requests.
-     - **Checksum**: Initially set to 0; it is computed later using the `checksum` function.
-     - **Identifier**: A fixed identifier (12345) is included for tracking requests.
-     - **Sequence Number**: A unique sequence number is assigned to each request, facilitating the tracking of individual requests.
-   - **Sending the ICMP Packet**: With the ICMP Echo Request packet prepared, the function sends the packet to the specified destination IP address.
-   - **Recording Send Time**: Importantly, the function records the time at which the request was sent. This timestamp is a critical component for measuring the round-trip time (RTT) accurately.
+- **resolve_hostname(target, force_ipv4=False, force_ipv6=False)**:
+  - Resolves a hostname to an IP address.
+  - Parameters:
+    - `target`: The hostname or IP address to resolve.
+    - `force_ipv4`: Boolean to force IPv4 resolution.
+    - `force_ipv6`: Boolean to force IPv6 resolution.
+  - Returns a tuple containing the resolved IP address and its version (4 or 6).
 
-3. **Receiving ICMP Echo Replies**: The utility is not complete without the ability to receive ICMP Echo Reply packets. This is where the `receive_ping_reply(icmp_socket, expected_seq_number)` function comes into play. It is responsible for continuously listening for incoming ICMP packets and processing them. The function works as follows:
-   - **Listening for Incoming Packets**: The function is in a continuous listening state, waiting for incoming network packets. Specifically, it's attentive to ICMP Echo Reply packets.
-   - **Extracting ICMP Header**: When an ICMP packet is received, the function extracts the ICMP header from the received packet. The ICMP header contains essential information such as the type of ICMP message, code, checksum, and sequence number.
-   - **Validating the Packet**: The function checks whether the received packet corresponds to an ICMP Echo Reply. For this, it looks at the ICMP message type, where type 0 signifies an ICMP Echo Reply. Furthermore, it verifies that the sequence number of the received packet matches the expected sequence number. If these conditions are met, the function proceeds with further processing.
-   - **Calculating Response Time**: When the received packet is confirmed as an ICMP Echo Reply and its sequence number matches the expected sequence number, the function returns the current time as the response time. This timestamp signifies when the response was received and is critical for calculating the RTT accurately.
+- **get_hostname(ip)**:
+  - Resolves an IP address to a hostname.
+  - Parameters:
+    - `ip`: The IP address to resolve.
+  - Returns the hostname or the IP address if the hostname cannot be resolved.
 
-### Ping Functionality
+- **main()**:
+  - Parses command-line arguments.
+  - Ensures the script is run as root.
+  - Resolves the target hostname.
+  - Determines the source IP address.
+  - Calls the ICMP ping function.
+  - Prints detailed statistics about the ping results.
 
-The core functionality of the custom ping utility is encapsulated within the `ping` function. This function orchestrates the entire process of sending ICMP Echo Requests, receiving ICMP Echo Replies, and measuring RTT. Here is an in-depth look at how it operates:
+#### Code Flow
+1. Parse command-line arguments using `argparse`.
+2. Check if the script is run as root.
+3. Resolve the target hostname to an IP address.
+4. Determine the source IP address used for sending packets.
+5. Call the `ping` function from `icmp_handler` to send ICMP echo requests.
+6. Print detailed statistics about the ping results, including RTT and packet loss.
 
-1. **Iterating Through Requests**: The `ping` function begins by iterating through the specified number of ping requests. The number of requests is defined by the user, providing control over the number of times the ICMP Echo Request will be dispatched to the target.
+### `icmp_handler.py`
 
-2. **Sending ICMP Echo Requests**: For each iteration, the function calls the `send_ping_request` function. This initiates the process of sending an ICMP Echo Request packet to the target. As the function iterates through requests, each request generates a new ICMP Echo Request packet and dispatches it to the target.
+#### Functions
 
-3. **Receiving ICMP Echo Replies**: Following the dispatch of each ICMP Echo Request, the `receive_ping_reply` function is invoked. It is responsible for receiving the corresponding ICMP Echo Reply. The function enters a waiting state, eagerly awaiting the arrival of the ICMP Echo Reply that matches the ICMP Echo Request it sent.
+- **checksum(data)**:
+  - Calculates the ICMP checksum for error detection.
+  - Parameters:
+    - `data`: The data to calculate the checksum for.
+  - Returns the calculated checksum.
 
-4. **RTT Calculation**: After receiving an ICMP Echo Reply, the function calculates the Round-Trip Time (RTT). RTT is a fundamental metric in networking and provides insights into the responsiveness of a network or host. The RTT is calculated by subtracting the time at which the ICMP Echo Request was sent from the time at which the corresponding ICMP Echo Reply was received.
+- **get_source_ip(target_ip, ip_version, interface=None)**:
+  - Determines the source IP address used for outgoing packets.
+  - Parameters:
+    - `target_ip`: The target IP address.
+    - `ip_version`: The IP version (4 or 6).
+    - `interface`: The network interface to use.
+  - Returns a tuple containing the source IP address and an error message (if any).
 
-5. **RTT Measurement and Recording**: Each calculated RTT is recorded and stored in a list, referred to as the `rtt_list`. This list serves as a repository for all the RTT values recorded during the ping operation. By storing the RTT values in a list, the utility enables further analysis and displays extensive statistics about the network's performance and latency.
+- **send_ping_request(sock, destination, sequence_number, ip_version)**:
+  - Sends an ICMP Echo Request.
+  - Parameters:
+    - `sock`: The socket to use for sending the request.
+    - `destination`: The destination IP address.
+    - `sequence_number`: The sequence number of the request.
+    - `ip_version`: The IP version (4 or 6).
+  - Returns the time the request was sent.
 
-### Usage
+- **receive_ping_reply(sock, expected_seq_number, ip_version, timeout=1)**:
+  - Waits for an ICMP Echo Reply.
+  - Parameters:
+    - `sock`: The socket to use for receiving the reply.
+    - `expected_seq_number`: The expected sequence number of the reply.
+    - `ip_version`: The IP version (4 or 6).
+    - `timeout`: The timeout for receiving the reply.
+  - Returns a tuple containing the time the reply was received and the responder's IP address.
 
-To utilize the custom ping utility, you must execute the script using Python 3. The utility's behavior and configurations can be tailored to specific requirements by utilizing a command structure that includes various command-line arguments:
+- **ping(target, num_requests, ip_version, interface=None, ttl=64)**:
+  - Sends multiple ICMP pings and prints results immediately.
+  - Parameters:
+    - `target`: The target IP address.
+    - `num_requests`: The number of ping requests to send.
+    - `ip_version`: The IP version (4 or 6).
+    - `interface`: The network interface to use.
+    - `ttl`: The Time-To-Live value for the packets.
+  - Returns a tuple containing an error message (if any), a list of RTT values, the number of transmitted packets, and the number of received packets.
 
-```bash
-python3 ping.py <target> <num_requests>
+#### Code Flow
+1. Create a raw socket for sending ICMP packets.
+2. Set the TTL value for the socket.
+3. If a network interface is specified, bind the socket to the interface.
+4. For each ping request:
+   - Send an ICMP Echo Request.
+   - Wait for an ICMP Echo Reply.
+   - Calculate the RTT and print the result.
+5. Print detailed statistics about the ping results, including RTT and packet loss.
+
+### `test.sh`
+
+- A shell script to run various tests on the custom ping utility.
+- Tests include:
+  - Pinging valid and invalid IP addresses.
+  - Pinging valid and invalid domains.
+  - Using different network interfaces.
+  - Using different TTL values.
+  - Sending different numbers of ping packets.
+  - Forcing IPv4 or IPv6 resolution.
+
+## Usage Examples
+
+Run the script with the following command-line arguments:
+
+```sh
+sudo python3 src/main.py <target> [options]
 ```
-![Output_Example](./png.png?raw=true "Output Example")
+
+## Available Arguments
+
+```sh
+usage: main.py [-h] [-c C] [-4] [-6] [-i INTERFACE] [-t TTL] target
+
+Custom Ping Utility
+
+positional arguments:
+  target        Target IP or domain
+
+options:
+  -h, --help    show this help message and exit
+  -c C          Number of ping requests (default: 5)
+  -4            Force IPv4
+  -6            Force IPv6
+  -i INTERFACE  Specify network interface
+  -t TTL        Set TTL (default: 64)
+```
+
+### Examples
+
+1. **Ping a valid IPv4 address**:
+    ```sh
+    sudo python3 src/main.py 8.8.8.8 -c 3
+    ```
+
+2. **Ping a valid IPv6 address**:
+    ```sh
+    sudo python3 src/main.py 2001:4860:4860::8888 -c 3 -6
+    ```
+
+3. **Ping a domain**:
+    ```sh
+    sudo python3 src/main.py google.com -c 3
+    ```
+
+4. **Force IPv4 resolution**:
+    ```sh
+    sudo python3 src/main.py google.com -4 -c 3
+    ```
+
+5. **Specify a network interface**:
+    ```sh
+    sudo python3 src/main.py 8.8.8.8 -i wlan0 -c 3
+    ```
+
+6. **Set TTL value**:
+    ```sh
+    sudo python3 src/main.py 8.8.8.8 -t 10 -c 3
+    ```
+
+## Running Tests
+
+To run the test script, use the following command:
+
+```sh
+sudo ./scripts/test.sh
+```
+
+This script will execute a series of tests to verify the functionality of the custom ping utility.
+
+Output of the test.sh script:
+
+```sh
+========== Running Tests ==========
+
+[TEST] Pinging a valid IPv4 address (Google DNS)
+PING 8.8.8.8 (8.8.8.8) from 10.50.38.184 using default interface:
+64 bytes from dns.google (8.8.8.8): icmp_seq=1 ttl=64 time=35.47 ms
+64 bytes from dns.google (8.8.8.8): icmp_seq=2 ttl=64 time=39.79 ms
+64 bytes from dns.google (8.8.8.8): icmp_seq=3 ttl=64 time=35.20 ms
+
+--- Ping Statistics ---
+Packets: Sent = 3, Received = 3, Lost = 0 (0.00% loss)
+Minimum RTT: 35.20 ms
+Maximum RTT: 39.79 ms
+Average RTT: 36.82 ms
+Standard Deviation RTT: 2.10 ms
+
+[TEST] Pinging a valid IPv6 address (Google IPv6 DNS)
+PING 2001:4860:4860::8888 (2001:4860:4860::8888) from 2400:4f20:11:a00::103:1e13 using default interface:
+64 bytes from dns.google (2001:4860:4860::8888): icmp_seq=1 ttl=64 time=20.68 ms
+64 bytes from dns.google (2001:4860:4860::8888): icmp_seq=2 ttl=64 time=20.39 ms
+64 bytes from dns.google (2001:4860:4860::8888): icmp_seq=3 ttl=64 time=18.06 ms
+
+--- Ping Statistics ---
+Packets: Sent = 3, Received = 3, Lost = 0 (0.00% loss)
+Minimum RTT: 18.06 ms
+Maximum RTT: 20.68 ms
+Average RTT: 19.71 ms
+Standard Deviation RTT: 1.17 ms
+
+[TEST] Pinging a valid domain (google.com)
+PING google.com (2404:6800:4007:820::200e) from 2400:4f20:11:a00::103:1e13 using default interface:
+64 bytes from maa05s25-in-x0e.1e100.net (2404:6800:4007:820::200e): icmp_seq=1 ttl=64 time=19.34 ms
+64 bytes from maa05s25-in-x0e.1e100.net (2404:6800:4007:820::200e): icmp_seq=2 ttl=64 time=19.90 ms
+64 bytes from maa05s25-in-x0e.1e100.net (2404:6800:4007:820::200e): icmp_seq=3 ttl=64 time=21.67 ms
+
+--- Ping Statistics ---
+Packets: Sent = 3, Received = 3, Lost = 0 (0.00% loss)
+Minimum RTT: 19.34 ms
+Maximum RTT: 21.67 ms
+Average RTT: 20.30 ms
+Standard Deviation RTT: 0.99 ms
+
+[TEST] Pinging an invalid domain (should fail)
+Error: Unable to resolve nonexistent.domain.xyz
+
+[TEST] Pinging an invalid IP address (should fail)
+Error: Unable to resolve 256.256.256.256
+
+[TEST] Pinging localhost (IPv4)
+PING 127.0.0.1 (127.0.0.1) from 127.0.0.1 using default interface:
+64 bytes from localhost (127.0.0.1): icmp_seq=1 ttl=64 time=0.02 ms
+64 bytes from localhost (127.0.0.1): icmp_seq=2 ttl=64 time=0.09 ms
+64 bytes from localhost (127.0.0.1): icmp_seq=3 ttl=64 time=0.06 ms
+
+--- Ping Statistics ---
+Packets: Sent = 3, Received = 3, Lost = 0 (0.00% loss)
+Minimum RTT: 0.02 ms
+Maximum RTT: 0.09 ms
+Average RTT: 0.06 ms
+Standard Deviation RTT: 0.03 ms
+
+[TEST] Pinging localhost (IPv6)
+PING ::1 (::1) from ::1 using default interface:
+64 bytes from localhost (::1): icmp_seq=1 ttl=64 time=0.09 ms
+64 bytes from localhost (::1): icmp_seq=2 ttl=64 time=0.08 ms
+64 bytes from localhost (::1): icmp_seq=3 ttl=64 time=0.07 ms
+
+--- Ping Statistics ---
+Packets: Sent = 3, Received = 3, Lost = 0 (0.00% loss)
+Minimum RTT: 0.07 ms
+Maximum RTT: 0.09 ms
+Average RTT: 0.08 ms
+Standard Deviation RTT: 0.01 ms
+
+[TEST] Using a non-existent interface (should fail)
+Error: The specified network interface 'nonexist0' does not exist or is not available.
+
+[TEST] Using a valid interface (replace wlan0 if needed)
+PING 8.8.8.8 (8.8.8.8) from 10.50.38.184 using interface wlan0:
+64 bytes from dns.google (8.8.8.8): icmp_seq=1 ttl=64 time=35.46 ms
+64 bytes from dns.google (8.8.8.8): icmp_seq=2 ttl=64 time=36.06 ms
+64 bytes from dns.google (8.8.8.8): icmp_seq=3 ttl=64 time=35.82 ms
+
+--- Ping Statistics ---
+Packets: Sent = 3, Received = 3, Lost = 0 (0.00% loss)
+Minimum RTT: 35.46 ms
+Maximum RTT: 36.06 ms
+Average RTT: 35.78 ms
+Standard Deviation RTT: 0.25 ms
+
+[TEST] Using different TTL values (TTL=10)
+PING 8.8.8.8 (8.8.8.8) from 10.50.38.184 using default interface:
+64 bytes from dns.google (8.8.8.8): icmp_seq=1 ttl=10 time=35.73 ms
+64 bytes from dns.google (8.8.8.8): icmp_seq=2 ttl=10 time=35.43 ms
+64 bytes from dns.google (8.8.8.8): icmp_seq=3 ttl=10 time=35.70 ms
+
+--- Ping Statistics ---
+Packets: Sent = 3, Received = 3, Lost = 0 (0.00% loss)
+Minimum RTT: 35.43 ms
+Maximum RTT: 35.73 ms
+Average RTT: 35.62 ms
+Standard Deviation RTT: 0.14 ms
+
+[TEST] Using different TTL values (TTL=255)
+PING 8.8.8.8 (8.8.8.8) from 10.50.38.184 using default interface:
+64 bytes from dns.google (8.8.8.8): icmp_seq=1 ttl=255 time=36.84 ms
+64 bytes from dns.google (8.8.8.8): icmp_seq=2 ttl=255 time=35.75 ms
+64 bytes from dns.google (8.8.8.8): icmp_seq=3 ttl=255 time=37.29 ms
+
+--- Ping Statistics ---
+Packets: Sent = 3, Received = 3, Lost = 0 (0.00% loss)
+Minimum RTT: 35.75 ms
+Maximum RTT: 37.29 ms
+Average RTT: 36.63 ms
+Standard Deviation RTT: 0.65 ms
+
+[TEST] Sending 1 ping packet
+PING 8.8.8.8 (8.8.8.8) from 10.50.38.184 using default interface:
+64 bytes from dns.google (8.8.8.8): icmp_seq=1 ttl=64 time=33.62 ms
+
+--- Ping Statistics ---
+Packets: Sent = 1, Received = 1, Lost = 0 (0.00% loss)
+Minimum RTT: 33.62 ms
+Maximum RTT: 33.62 ms
+Average RTT: 33.62 ms
+Standard Deviation RTT: 0.00 ms
+
+[TEST] Sending 5 ping packets
+PING 8.8.8.8 (8.8.8.8) from 10.50.38.184 using default interface:
+64 bytes from dns.google (8.8.8.8): icmp_seq=1 ttl=64 time=52.29 ms
+64 bytes from dns.google (8.8.8.8): icmp_seq=2 ttl=64 time=34.17 ms
+64 bytes from dns.google (8.8.8.8): icmp_seq=3 ttl=64 time=36.26 ms
+64 bytes from dns.google (8.8.8.8): icmp_seq=4 ttl=64 time=35.59 ms
+64 bytes from dns.google (8.8.8.8): icmp_seq=5 ttl=64 time=54.42 ms
+
+--- Ping Statistics ---
+Packets: Sent = 5, Received = 5, Lost = 0 (0.00% loss)
+Minimum RTT: 34.17 ms
+Maximum RTT: 54.42 ms
+Average RTT: 42.55 ms
+Standard Deviation RTT: 8.88 ms
+
+[TEST] Forcing IPv4 resolution on google.com
+PING google.com (142.250.193.142) from 10.50.38.184 using default interface:
+64 bytes from maa05s25-in-f14.1e100.net (142.250.193.142): icmp_seq=1 ttl=64 time=28.05 ms
+64 bytes from maa05s25-in-f14.1e100.net (142.250.193.142): icmp_seq=2 ttl=64 time=31.74 ms
+64 bytes from maa05s25-in-f14.1e100.net (142.250.193.142): icmp_seq=3 ttl=64 time=27.52 ms
+
+--- Ping Statistics ---
+Packets: Sent = 3, Received = 3, Lost = 0 (0.00% loss)
+Minimum RTT: 27.52 ms
+Maximum RTT: 31.74 ms
+Average RTT: 29.10 ms
+Standard Deviation RTT: 1.88 ms
+
+[TEST] Forcing IPv6 resolution on google.com
+PING google.com (2404:6800:4007:820::200e) from 2400:4f20:11:a00::103:1e13 using default interface:
+64 bytes from maa05s25-in-x0e.1e100.net (2404:6800:4007:820::200e): icmp_seq=1 ttl=64 time=19.49 ms
+64 bytes from maa05s25-in-x0e.1e100.net (2404:6800:4007:820::200e): icmp_seq=2 ttl=64 time=23.99 ms
+64 bytes from maa05s25-in-x0e.1e100.net (2404:6800:4007:820::200e): icmp_seq=3 ttl=64 time=19.25 ms
+
+--- Ping Statistics ---
+Packets: Sent = 3, Received = 3, Lost = 0 (0.00% loss)
+Minimum RTT: 19.25 ms
+Maximum RTT: 23.99 ms
+Average RTT: 20.91 ms
+Standard Deviation RTT: 2.18 ms
+========== All Tests Completed ==========
+```
+## Required Dependencies
+
+- Python 3.x
+- `argparse` (standard library)
+- `socket` (standard library)
+- `sys` (standard library)
+- `os` (standard library)
+- `math` (standard library)
+
+## Supported Versions
+
+- Python 3.6 and above
+
+
